@@ -1,22 +1,22 @@
 import javax.swing.*;
-import javax.swing.event.*;
 import java.awt.GridLayout;
 import java.awt.event.*;
 import java.awt.*;
-import java.awt.event.ActionListener;
+import java.rmi.server.*;
+import java.rmi.registry.*;
 
 class Mine
 {    
-    int n=10;
+    int n=5;
 	int x[][]=new int[n][n];  
-   
+    boolean gamedone=false;
     Mine()//Initializes Mine matrix with mines
     {   
         int count=0;//To count number of mines initialized
-        while(count<=20)
+        while(count<n)
         {
-            double r=Math.floor((Math.random()*10));
-            double c=Math.floor((Math.random()*10));
+            double r=Math.floor((Math.random()*n));
+            double c=Math.floor((Math.random()*n));
             int i=(int)r;
             int j=(int)c;
             if(x[i][j]==-1)
@@ -29,9 +29,9 @@ class Mine
                 count++;
             }
         }   
-            for(int i=0;i<10;i++)
+            for(int i=0;i<n;i++)
             {
-                for(int j=0;j<10;j++)
+                for(int j=0;j<n;j++)
                 {
                     int d=0;//counts for the value that the tile should hold;
                     if(x[i][j]==-1)
@@ -47,7 +47,7 @@ class Mine
                             if(x[i+1][j+1]==-1)
                             d++;
                         }                        
-                        else if(j==9)
+                        else if(j==n-1)
                         {
                             if(x[i][j-1]==-1)
                             d++;
@@ -70,7 +70,7 @@ class Mine
                             d++;
                         }
                     }
-                    else if(i==9)
+                    else if(i==n-1)
                     {
                         if(j==0)
                         {
@@ -81,7 +81,7 @@ class Mine
                             if(x[i-1][j+1]==-1)
                             d++;
                         }                        
-                        else if(j==9)
+                        else if(j==n-1)
                         {
                             if(x[i][j-1]==-1)
                             d++;
@@ -117,7 +117,7 @@ class Mine
                         if(x[i-1][j+1]==-1)
                         d++;
                     }
-                    else if(j==9)
+                    else if(j==n-1)
                     {
                         if(x[i][j-1]==-1)
                         d++;
@@ -156,6 +156,19 @@ class Mine
      public static void main(String[] args) 
         {
               new  Minesweeper();
+              try {
+                  BotServer obj = new BotServer();
+                  BotInterface stub = (BotInterface) UnicastRemoteObject.exportObject(obj, 0);
+
+                  // Bind the remote object's stub in the registry
+                  Registry registry = LocateRegistry.getRegistry();
+                  registry.bind("Bot", stub);
+
+                  System.out.println("Server ready");
+              } catch (Exception e) {
+                  System.out.println("Server exception: " + e.toString());
+                  e.printStackTrace();
+              }
         }
 }
 class Minesweeper extends Mine
@@ -166,46 +179,54 @@ class Minesweeper extends Mine
     { 
         super();
         f= new JFrame("Minesweeper game") ;
-        f.setLayout(new GridLayout(10,10));
-        f.setSize(500,500);
+        f.setLayout(new GridLayout(n,n));
+        f.setSize(250,250);
         f.setResizable(false);
         f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        b= new JButton[10][10];
+        b= new JButton[n][n];
         update();
         f.setVisible(true);                
     }     
     void update()
     {
-        for(int i=0;i<10;i++)
+        for(int i=0;i<n;i++)
         {
-            for(int j=0;j<10;j++)
+            for(int j=0;j<n;j++)
             {                            
                 b[i][j]=new JButton();
                 f.add(b[i][j]);      
                 final int num=x[i][j];
                 final int i_f=i,j_f=j;
-              
+                b[i][j].setBackground(Color.lightGray);
                 b[i][j].addMouseListener(new MouseAdapter(){
                 	  public void mouseClicked(MouseEvent e){
                 		  JButton btn = (JButton)e.getSource();
                 		  check_win();
-                		  if(num!=-1 && num!=0){
-                		  if (e.getButton() == MouseEvent.BUTTON1) {
+                		  if(e.getButton() == MouseEvent.BUTTON1){
+                		  if (num!=-1 && num!=0) {
                 	    	 btn.setText(num+"");
- 							btn.setEnabled(false);
-                	    }
-                	    if (e.getButton() == MouseEvent.BUTTON3) {
-                	    	btn.setIcon(new ImageIcon("D:\\files\\flag.ico"));
-               	    }
+ 							 btn.setBackground(Color.white);
+                	    	 btn.setEnabled(false);
+ 							return;
+                		  }
+                		  if(num==0){
+                  	    	remove_zeroes(i_f,j_f);
+                  	    	 }
+                  	    if(num==-1){
+                  	    	gameover();
+                  	    	gamedone=true;
+                  	    	}
+                	
                 	  return;
                 	    }
-                	    if(num==0){
-                	    	remove_zeroes(i_f,j_f);
-                	    	 }
-                	    else{
-                	    	gameover();
-                	    	
-                	    }
+                		    if (e.getButton() == MouseEvent.BUTTON3) {
+                    	    	if(btn.getBackground()==Color.lightGray)
+                		    	btn.setBackground(Color.blue);
+                    	    	else
+                    	    	btn.setBackground(Color.lightGray);	
+                   	    }
+                		
+                	    check_win();
                 	  }
                 });
             }
@@ -214,9 +235,9 @@ class Minesweeper extends Mine
     }
     void gameover()
     {
-        for(int i=0;i<10;i++)
+        for(int i=0;i<n;i++)
         {
-            for(int j=0;j<10;j++)
+            for(int j=0;j<n;j++)
             {                            
                 if(x[i][j]==-1){
                 	b[i][j].setText("X");
@@ -226,48 +247,37 @@ class Minesweeper extends Mine
                 
         }
         f.setTitle("Game Over!");
-        f.setEnabled(false);
+        //f.setEnabled(false);
     }
-    void remove_zeroes(int i,int j)
-    {       
-        if(i>n || j>n)
-        {
-            return;
-        }
-        try
-        {
-            if(x[i][j]>=1)
-            {
-                
-                b[i][j].setText(x[i][j]+"");
-                b[i][j].setEnabled(false);
-                return;
-
-            }
-            
-            if(x[i][j]==0 && b[i][j].isEnabled() )
-            {
-                b[i][j].setEnabled(false);
-                remove_zeroes(i+1, j);
-                remove_zeroes(i-1, j);
-                remove_zeroes(i, j+1);
-                remove_zeroes(i, j-1);
-                remove_zeroes(i+1, j-1);
-                remove_zeroes(i+1, j+1);
-                remove_zeroes(i-1, j-1);
-                remove_zeroes(i-1, j+1);
-            }
-            
-            
-        }
-        catch(ArrayIndexOutOfBoundsException e)
-        {
-            return;
-
-        }
+    void remove_zeroes(int i,int j){
+    	
+    	if(i>n || j>n){
+    		return;
+    	}
+    	try{
+    	if(x[i][j]==0 && b[i][j].isEnabled()){
+    	b[i][j].setBackground(Color.white);
+    	b[i][j].setEnabled(false);
+    	remove_zeroes(i+1, j);
+    	remove_zeroes(i-1, j);
+    	remove_zeroes(i, j+1);
+    	remove_zeroes(i, j-1);
+    	remove_zeroes(i+1, j-1);
+    	remove_zeroes(i+1, j+1);
+    	remove_zeroes(i-1, j-1);
+    	remove_zeroes(i-1, j+1);
+    	}
+    	if(x[i][j]!=0 && x[i][j]!=-1 && b[i][j].isEnabled()){
+    		b[i][j].setText(x[i][j]+"");
+    		b[i][j].setBackground(Color.white);
+    		b[i][j].setEnabled(false);
+    	}
+    	}
+    	catch(ArrayIndexOutOfBoundsException e){
+    		return;
+    	}
 
     }
-
     void check_win(){
     	int count=0;
     	for(int i=0;i<n;i++){
@@ -276,11 +286,36 @@ class Minesweeper extends Mine
     				count++;
     		}
     	}
-    	if(count==21){
-    		f.setTitle("CONGRATULATIONS!!! YOU WON THE GAME!!");
+    	if(count==n){
+    		f.setTitle("YOU WON THE GAME!!");
     		f.setEnabled(false);
+    		gamedone=true;
     	}
     	}
     	
+}
+
+//bot interface functions...
+
+class BotServer extends Minesweeper implements BotInterface{
+	public Point getLocation(int i, int j) throws Exception
+	{
+        Point p = b[i][j].getLocationOnScreen();
+        return p;
+	}
+	public int getno(int i, int j) throws Exception
+	{
+	if(b[i][j].isEnabled())
+	return -2;
+	if(b[i][j].isEnabled() && b[i][j].getBackground()==Color.blue)
+		return -1;
+	if(!b[i][j].isEnabled() && b[i][j].getText()=="")
+		return 0;
+	else
+		return Integer.parseInt(b[i][j].getText());	
+	}
+	public boolean gamedone() throws Exception{
+		return gamedone;
+	}
 }
 

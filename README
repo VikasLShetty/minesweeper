@@ -1,4 +1,6 @@
-An exceedingly simple minesweeper game coded in JAVA.
+Minesweeper game along with bot to solve the same.
 Swing package is used for the GUI.
+Java RMI is used for game-bot interaction.
+Bot uses the logic of probability to solve the minesweeper(most of the time).
 
 Programming credits shared with Anuj Raghuram.
